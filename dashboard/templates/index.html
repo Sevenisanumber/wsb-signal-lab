@@ -161,6 +161,21 @@
     .badge-failure { background: rgba(248,81,73,0.15); color: var(--red); }
     .badge-running { background: rgba(88,166,255,0.15); color: var(--blue); }
 
+    /* ── paper trading badges ───────────────────────────────────────── */
+    .badge-hot  { background: rgba(88,166,255,0.15); color: var(--blue); }
+    .badge-slow { background: rgba(227,179,65,0.15);  color: #e3b341; }
+    .badge-tp   { background: rgba(63,185,80,0.15);   color: var(--green); }
+    .badge-sl   { background: rgba(248,81,73,0.15);   color: var(--red); }
+    .badge-te   { background: rgba(139,148,158,0.15); color: var(--muted); }
+
+    /* ── stat card sub-label ─────────────────────────────────────────── */
+    .stat-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 5px;
+      font-family: var(--mono);
+    }
+
     /* ── empty state ─────────────────────────────────────────────── */
     .empty {
       padding: 24px;
@@ -277,6 +292,199 @@
   {% else %}
   <div class="empty">No daily mention data yet — run scrapers/fetch_daily_mentions.py to populate.</div>
   {% endif %}
+</section>
+
+<!-- ═══ PAPER TRADING ════════════════════════════════════════════════════════ -->
+<section id="paper-trading">
+  <div class="section-title">
+    Paper Trading
+    <em>Alpaca · Phase 4 · $100/trade</em>
+  </div>
+
+  {% if not pt.has_data %}
+  <div class="empty">No trades yet — monitoring begins Monday</div>
+
+  {% else %}
+
+  {# ── Portfolio summary ── #}
+  {% set s = pt.summary %}
+  <div class="stats">
+
+    <div class="stat">
+      <div class="stat-label">Total P&amp;L</div>
+      <div class="stat-value {% if s.total_pnl > 0 %}ok{% elif s.total_pnl < 0 %}err{% endif %}">
+        {% if s.total_pnl >= 0 %}+{% endif %}${{ "%.2f"|format(s.total_pnl) }}
+      </div>
+      {% if s.total_pnl_pct is not none %}
+      <div class="stat-sub {% if s.total_pnl_pct > 0 %}pos{% elif s.total_pnl_pct < 0 %}neg{% endif %}">
+        {% if s.total_pnl_pct >= 0 %}+{% endif %}{{ "%.1f"|format(s.total_pnl_pct) }}% on ${{ "%.0f"|format(s.total_deployed) }} deployed
+      </div>
+      {% endif %}
+      {% if s.realized_pnl != s.total_pnl %}
+      <div class="stat-sub">realized: {% if s.realized_pnl >= 0 %}+{% endif %}${{ "%.2f"|format(s.realized_pnl) }}</div>
+      {% endif %}
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">Win Rate</div>
+      {% if s.win_rate is not none %}
+      <div class="stat-value {% if s.win_rate >= 50 %}ok{% else %}err{% endif %}">
+        {{ s.win_rate }}%
+      </div>
+      <div class="stat-sub">{{ s.closed_count }} closed trade{{ 's' if s.closed_count != 1 }}</div>
+      {% else %}
+      <div class="stat-value na">—</div>
+      <div class="stat-sub">no closed trades yet</div>
+      {% endif %}
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">Total Trades</div>
+      <div class="stat-value">{{ s.total_trades }}</div>
+      <div class="stat-sub">{{ s.open_count }} open · {{ s.closed_count }} closed</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">Open Positions</div>
+      <div class="stat-value">{{ s.open_count }}</div>
+      <div class="stat-sub">of 3 max · ${{ "%.0f"|format(s.open_count * 100) }} exposure</div>
+    </div>
+
+  </div>
+
+  {# ── Open positions ── #}
+  <div class="section-title" style="margin-bottom:10px;">Open Positions</div>
+  {% if pt.open_positions %}
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Ticker</th>
+        <th>Signal</th>
+        <th>Entry Date</th>
+        <th class="r">Entry Price</th>
+        <th class="r">Current</th>
+        <th class="r">Unrealized P&amp;L</th>
+        <th class="r">Unrealized %</th>
+        <th class="r">Days Held</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pt.open_positions %}
+      <tr>
+        <td><span class="ticker">{{ p.ticker }}</span></td>
+        <td>
+          {% if p.signal_type == 'HOT_SCORE' %}
+            <span class="badge badge-hot">HOT</span>
+          {% elif p.signal_type == 'SLOW_BURN' %}
+            <span class="badge badge-slow">SLOW BURN</span>
+          {% else %}
+            <span class="na">{{ p.signal_type }}</span>
+          {% endif %}
+        </td>
+        <td class="num na">{{ p.entry_date }}</td>
+        <td class="r num">{{ p.entry_price | price }}</td>
+        <td class="r num">
+          {% if p.current_price is not none %}{{ p.current_price | price }}
+          {% else %}<span class="na">—</span>{% endif %}
+        </td>
+        <td class="r num">
+          {% if p.upnl is not none %}
+            <span class="{% if p.upnl >= 0 %}pos{% else %}neg{% endif %}">
+              {% if p.upnl >= 0 %}+{% endif %}${{ "%.2f"|format(p.upnl) }}
+            </span>
+          {% else %}<span class="na">—</span>{% endif %}
+        </td>
+        <td class="r num">
+          {% if p.upnl_pct is not none %}
+            <span class="{% if p.upnl_pct >= 0 %}pos{% else %}neg{% endif %}">
+              {% if p.upnl_pct >= 0 %}+{% endif %}{{ "%.1f"|format(p.upnl_pct) }}%
+            </span>
+          {% else %}<span class="na">—</span>{% endif %}
+        </td>
+        <td class="r num na">{{ p.days_held }}d</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty" style="text-align:left; padding: 10px 0 18px;">No open positions.</div>
+  {% endif %}
+
+  {# ── Recent closed trades ── #}
+  <div class="section-title" style="margin-top:20px; margin-bottom:10px;">
+    Recent Closed Trades
+    <em>Last 10</em>
+  </div>
+  {% if pt.closed_trades %}
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Ticker</th>
+        <th>Signal</th>
+        <th>Entry</th>
+        <th>Exit</th>
+        <th class="r">Entry Price</th>
+        <th class="r">Exit Price</th>
+        <th class="r">Realized P&amp;L</th>
+        <th class="r">Return %</th>
+        <th>Exit Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in pt.closed_trades %}
+      <tr>
+        <td><span class="ticker">{{ t.ticker }}</span></td>
+        <td>
+          {% if t.signal_type == 'HOT_SCORE' %}
+            <span class="badge badge-hot">HOT</span>
+          {% elif t.signal_type == 'SLOW_BURN' %}
+            <span class="badge badge-slow">SLOW BURN</span>
+          {% else %}
+            <span class="na">{{ t.signal_type }}</span>
+          {% endif %}
+        </td>
+        <td class="num na">{{ t.entry_date }}</td>
+        <td class="num na">{{ t.exit_date }}</td>
+        <td class="r num">{{ t.entry_price | price }}</td>
+        <td class="r num">{{ t.exit_price | price }}</td>
+        <td class="r num">
+          {% if t.pnl is not none %}
+            <span class="{% if t.pnl >= 0 %}pos{% else %}neg{% endif %}">
+              {% if t.pnl >= 0 %}+{% endif %}${{ "%.2f"|format(t.pnl) }}
+            </span>
+          {% else %}<span class="na">—</span>{% endif %}
+        </td>
+        <td class="r num">
+          {% if t.pnl_pct is not none %}
+            <span class="{% if t.pnl_pct >= 0 %}pos{% else %}neg{% endif %}">
+              {% if t.pnl_pct >= 0 %}+{% endif %}{{ "%.1f"|format(t.pnl_pct) }}%
+            </span>
+          {% else %}<span class="na">—</span>{% endif %}
+        </td>
+        <td>
+          {% if t.exit_reason == 'take_profit' %}
+            <span class="badge badge-tp">take profit</span>
+          {% elif t.exit_reason == 'stop_loss' %}
+            <span class="badge badge-sl">stop loss</span>
+          {% elif t.exit_reason == 'time_exit' %}
+            <span class="badge badge-te">7-day exit</span>
+          {% else %}
+            <span class="na">{{ t.exit_reason or '—' }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty" style="text-align:left; padding: 10px 0;">No closed trades yet.</div>
+  {% endif %}
+
+  {% endif %}{# end has_data #}
 </section>
 
 <!-- ═══ SIGNAL HISTORY ═══════════════════════════════════════════════════════ -->
