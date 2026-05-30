@@ -35,6 +35,9 @@ from datetime import datetime, timedelta
 ROOT    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(ROOT, 'data', 'wsb.db')
 LOG_DIR = os.path.join(ROOT, 'logs')
+sys.path.insert(0, ROOT)
+
+from scrapers.notify import send_pushover
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -281,6 +284,12 @@ def check_exits(api, conn, today: str, dry_run: bool = False) -> int:
                 f'P&L={sign}${pnl:.2f} ({sign}{pnl_pct_final:.1f}%)'
                 + (' [DRY RUN]' if dry_run else '')
             )
+            if not dry_run:
+                send_pushover(
+                    f'SOLD {ticker} @ ${actual_exit_price:.2f} | '
+                    f'P&L: {sign}${pnl:.2f} ({sign}{pnl_pct_final:.1f}%) | '
+                    f'Reason: {exit_reason}'
+                )
             closed += 1
         else:
             sign = '+' if pnl_pct >= 0 else ''
@@ -438,6 +447,12 @@ def run_trading(date: str, db_path: str = DB_PATH, dry_run: bool = False) -> Non
             f'shares={actual_shares:.4f} | size=${POSITION_SIZE:.0f} | trade_id={trade_id}'
             + (' [DRY RUN]' if dry_run else '')
         )
+        if not dry_run:
+            send_pushover(
+                f'BUY {ticker} @ ${actual_entry_price:.2f} | '
+                f'Signal: {signal_type} {score:.1f} | '
+                f'Size: ${POSITION_SIZE:.0f}'
+            )
 
     conn.close()
     log.info('=== Paper trader done ===')
