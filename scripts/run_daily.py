@@ -19,6 +19,7 @@ import sys
 import sqlite3
 import time
 import logging
+from datetime import datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -95,12 +96,25 @@ def main() -> int:
     from scrapers.extract_tickers      import run_extraction
     from scrapers.calc_returns         import calc_returns
     from scrapers.fetch_daily_mentions import fetch_daily_mentions
+    from scrapers.daily_report         import generate_report
+
+    def run_daily_report():
+        report = generate_report()
+        date = datetime.now().strftime('%Y-%m-%d')
+        out  = os.path.join(ROOT, 'logs', f'daily_report_{date}.txt')
+        with open(out, 'w') as f:
+            f.write(report)
+            f.write('\n')
+        log.info(f'Daily report written to {out}')
+        print(report)
+        return 1  # non-zero so run_step counts it as a "row"
 
     steps = [
         ('fetch_prices',         fetch_prices),
         ('extract_tickers',      run_extraction),
         ('calc_returns',         calc_returns),
         ('fetch_daily_mentions', fetch_daily_mentions),
+        ('daily_report',         run_daily_report),
     ]
 
     any_failed = False
